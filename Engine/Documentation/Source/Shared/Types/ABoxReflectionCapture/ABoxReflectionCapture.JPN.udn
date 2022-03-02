@@ -1,0 +1,10 @@
+INTSourceChangelist:3108692
+Availability:NoPublish
+Title:ABoxReflectionCapture
+Crumbs:
+Description: BoxReflectionCapture クラスの概要
+
+[EXCERPT:ABoxReflectionCapture]
+
+Box Reflection Capture アクタ は、アンリアル エンジン 4 で利用可能な 2 つの Reflection Capture アクタのうちの 1 つです。このアクタはランタイム以前に計算されるため、パフォーマンスにほとんど影響を与えずにワールド内に配置することが可能です。
+[/EXCERPT:ABoxReflectionCapture]
