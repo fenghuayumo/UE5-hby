@@ -6,8 +6,8 @@ RWByteAddressBuffer DispatchArgs;
 [numthreads(1, 1, 1)]
 void PreDispatchTrace() 
 {
-    const uint surfel_count = SurfelMetaBuf.Load(sizeof(uint) * 1);
-    DispatchArgs.Store4(0, uint4(surfel_count, 1, 1, 0));
+   const uint SurfelCount = SurfelMetaBuf.Load(4 * 1);
+    DispatchArgs.Store4(0, uint4(SurfelCount, 1, 1, 0));
 }
 
 #endif
@@ -357,9 +357,9 @@ RAY_TRACING_ENTRY_RAYGEN(SurfelTraceRGS)
 
 	// AmbientOcclusion = saturate(AmbientOcclusion);
 
-#if USE_PREEXPOSURE
-	Irradiance *= View.PreExposure;
-#endif
+// #if USE_PREEXPOSURE
+// 	Irradiance *= View.PreExposure;
+// #endif
 
 	const float TotalSampleCount = PrevRadiancePacked.w + ValidSampleCount;
     const float BlendFactorNew = ValidSampleCount / max(1, TotalSampleCount);

@@ -39,19 +39,11 @@ DECLARE_GPU_STAT_NAMED(TraceSurfel, TEXT("Surfel GI: SurfelTrace"));
 DECLARE_GPU_STAT_NAMED(ApplySurfel, TEXT("Surfel GI: ApplySurfel"));
 DECLARE_GPU_STAT_NAMED(SurfelInclusivePrefixScan, TEXT("Surfel GI: InclusivePrefixScan"));
 
-struct FVertexPacked
+struct SurfelVertexPacked
 {
-	FUintVector4	data0;
-	FUintVector4	data1;
+	FVector4f   data0;
+	FVector4f   data1;
 };
-BEGIN_SHADER_PARAMETER_STRUCT(FSurfelGridHashParameters, )
-SHADER_PARAMETER_RDG_BUFFER_UAV(RWByteAddressBuffer, SurfelHashKeyBuf)
-SHADER_PARAMETER_RDG_BUFFER_UAV(RWByteAddressBuffer, SurfelHashValueBuf)
-SHADER_PARAMETER_RDG_BUFFER_SRV(ByteAddressBuffer, CellIndexOffsetBuf)
-SHADER_PARAMETER_RDG_BUFFER_SRV(ByteAddressBuffer, SurfelIndexBuf)
-SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<FVertexPacked>, SurfelVertexBuf)
-SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<FVector4>, SurfelIrradianceBuf)
-END_SHADER_PARAMETER_STRUCT()
 
 class FFindMissSurfelCS : public FGlobalShader
 {
@@ -83,8 +75,8 @@ class FFindMissSurfelCS : public FGlobalShader
 		SHADER_PARAMETER_RDG_BUFFER_UAV(RWByteAddressBuffer, SurfelHashValueBuf)
 		SHADER_PARAMETER_RDG_BUFFER_UAV(RWByteAddressBuffer, CellIndexOffsetBuf)
 		SHADER_PARAMETER_RDG_BUFFER_UAV(RWByteAddressBuffer, SurfelIndexBuf)
-		SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<FVertexPacked>, SurfelVertexBuf)
-		SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<FVector4>, SurfelIrradianceBuf)
+		SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<SurfelVertexPacked>, SurfelVertexBuf)
+		SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<float4>, SurfelIrradianceBuf)
 
 		SHADER_PARAMETER_RDG_BUFFER_UAV(RWByteAddressBuffer, SurfelMetaBuf)
 		SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<float4>, SurfelSHBuf)
@@ -99,17 +91,11 @@ class FFindMissSurfelCS : public FGlobalShader
 		SHADER_PARAMETER_SAMPLER(SamplerState, PointClampSampler)
 		SHADER_PARAMETER_SAMPLER(SamplerState, LinearClampSampler)
 		SHADER_PARAMETER(FVector4f, ScaledViewSizeAndInvSize)
+
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, ViewUniformBuffer)
 		END_SHADER_PARAMETER_STRUCT()
 };
 IMPLEMENT_GLOBAL_SHADER(FFindMissSurfelCS, "/Engine/Private/SurfelGI/AllocateSurfel.usf", "FindMissSurfel", SF_Compute);
-
-struct SurfelVertexPacked
-{
-	FVector4   data0;
-	FVector4   data1;
-};
-
 
 class FAllocateSurfelCS : public FGlobalShader
 {
@@ -152,7 +138,8 @@ class FAllocateSurfelCS : public FGlobalShader
 
 		SHADER_PARAMETER_SAMPLER(SamplerState, PointClampSampler)
 		SHADER_PARAMETER_SAMPLER(SamplerState, LinearClampSampler)
-		SHADER_PARAMETER(FVector4f, ScaledViewSizeAndInvSize)
+		//SHADER_PARAMETER(FVector4f, ScaledViewSizeAndInvSize)
+		SHADER_PARAMETER(FIntPoint, TileSurfelAllocTexSize)
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, ViewUniformBuffer)
 		END_SHADER_PARAMETER_STRUCT()
 };
@@ -179,7 +166,7 @@ class FDispatchSurfelArgsCS : public FGlobalShader
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER_RDG_BUFFER_SRV(ByteAddressBuffer, SurfelMetaBuf)
-		SHADER_PARAMETER_RDG_BUFFER_UAV(RWByteAddressBuffer, IndirectDispatchArgs)
+		SHADER_PARAMETER_RDG_BUFFER_UAV(RWBuffer<uint>, RWIndirectDispatchArgs)
 	END_SHADER_PARAMETER_STRUCT()
 };
 IMPLEMENT_GLOBAL_SHADER(FDispatchSurfelArgsCS, "/Engine/Private/SurfelGI/AssignSurfelsToGridCells.usf", "PrepareDispatchArgs", SF_Compute);
@@ -218,8 +205,8 @@ class FCountSurfelPerCellCS : public FGlobalShader
 		SHADER_PARAMETER_RDG_BUFFER_UAV(RWByteAddressBuffer, SurfelIndexBuf)
 		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<float4>, SurfelIrradianceBuf)
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, ViewUniformBuffer)
-		// SHADER_PARAMETER_RDG_BUFFER(ByteAddressBuffer, IndirectDispatchArgs)
-		RDG_BUFFER_ACCESS(IndirectDispatchArgs, ERHIAccess::IndirectArgs)
+		// SHADER_PARAMETER_RDG_BUFFER(ByteAddressBuffer, RWIndirectDispatchArgs)
+		RDG_BUFFER_ACCESS(RWIndirectDispatchArgs, ERHIAccess::IndirectArgs)
 	END_SHADER_PARAMETER_STRUCT()
 };
 IMPLEMENT_GLOBAL_SHADER(FCountSurfelPerCellCS, "/Engine/Private/SurfelGI/AssignSurfelsToGridCells.usf", "CountSurfelsPerCell", SF_Compute);
@@ -259,7 +246,7 @@ class FSlotSurfelIntoCellCS : public FGlobalShader
 		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<float4>, SurfelIrradianceBuf)
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, ViewUniformBuffer)
 		// SHADER_PARAMETER_RDG_BUFFER(ByteAddressBuffer, IndirectDispatchArgs)
-		RDG_BUFFER_ACCESS(IndirectDispatchArgs, ERHIAccess::IndirectArgs)
+		RDG_BUFFER_ACCESS(RWIndirectDispatchArgs, ERHIAccess::IndirectArgs)
 	END_SHADER_PARAMETER_STRUCT()
 };
 IMPLEMENT_GLOBAL_SHADER(FSlotSurfelIntoCellCS, "/Engine/Private/SurfelGI/AssignSurfelsToGridCells.usf", "SlotSurfelIntoCell", SF_Compute);
@@ -291,8 +278,8 @@ class FClearSurfelCS : public FGlobalShader
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 
 		SHADER_PARAMETER_RDG_BUFFER_UAV(RWByteAddressBuffer, CellIndexOffsetBuf)
-		// SHADER_PARAMETER_RDG_BUFFER(ByteAddressBuffer, IndirectDispatchArgs)
-		RDG_BUFFER_ACCESS(IndirectDispatchArgs, ERHIAccess::IndirectArgs)
+		// SHADER_PARAMETER_RDG_BUFFER(ByteAddressBuffer, RWIndirectDispatchArgs)
+		RDG_BUFFER_ACCESS(RWIndirectDispatchArgs, ERHIAccess::IndirectArgs)
 	END_SHADER_PARAMETER_STRUCT()
 };
 IMPLEMENT_GLOBAL_SHADER(FClearSurfelCS, "/Engine/Private/SurfelGI/AssignSurfelsToGridCells.usf", "ClearSurfels", SF_Compute);
@@ -583,7 +570,7 @@ void InclusivePrefixScan(FRDGBuilder& GraphBuilder, FRDGBufferRef& InputBuf)
 	{
 		TShaderMapRef<FPrefixScanCS> ComputeShader(GetGlobalShaderMap(ERHIFeatureLevel::SM5));
 		FPrefixScanCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FPrefixScanCS::FParameters>();
-		PassParameters->InoutBuf = GraphBuilder.CreateUAV(InputBuf, EPixelFormat::PF_R8_UINT);
+		PassParameters->InoutBuf = GraphBuilder.CreateUAV(InputBuf);
 		FComputeShaderUtils::AddPass(
 			GraphBuilder,
 			RDG_EVENT_NAME("PrefixScanCS"),
@@ -592,13 +579,13 @@ void InclusivePrefixScan(FRDGBuilder& GraphBuilder, FRDGBufferRef& InputBuf)
 			FComputeShaderUtils::GetGroupCount(FIntVector(SEGMENT_SIZE * SEGMENT_SIZE / 2, 1, 1), FIntVector(FPrefixScanCS::GetThreadBlockSize())));
 	}
 
-	auto SegmentBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), SEGMENT_SIZE), TEXT("SegmentBuf"));
-
+	auto SegmentBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateByteAddressDesc(sizeof(uint32) * SEGMENT_SIZE), TEXT("SegmentBuf"));
+	AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(SegmentBuf), 0);
 	{
 		TShaderMapRef<FPrefixScanSegmentCS> ComputeShader(GetGlobalShaderMap(ERHIFeatureLevel::SM5));
 		FPrefixScanSegmentCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FPrefixScanSegmentCS::FParameters>();
-		PassParameters->InputBuf = GraphBuilder.CreateSRV(InputBuf, EPixelFormat::PF_R8_UINT);
-		PassParameters->OutputBuf = GraphBuilder.CreateUAV(SegmentBuf, EPixelFormat::PF_R8_UINT);
+		PassParameters->InputBuf = GraphBuilder.CreateSRV(InputBuf);
+		PassParameters->OutputBuf = GraphBuilder.CreateUAV(SegmentBuf);
 		FComputeShaderUtils::AddPass(
 			GraphBuilder,
 			RDG_EVENT_NAME("PrefixScanSegmentCS"),
@@ -609,8 +596,8 @@ void InclusivePrefixScan(FRDGBuilder& GraphBuilder, FRDGBufferRef& InputBuf)
 	{
 		TShaderMapRef<FPrefixScanMergeCS> ComputeShader(GetGlobalShaderMap(ERHIFeatureLevel::SM5));
 		FPrefixScanMergeCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FPrefixScanMergeCS::FParameters>();
-		PassParameters->InoutBuf = GraphBuilder.CreateUAV(InputBuf, EPixelFormat::PF_R8_UINT);
-		PassParameters->SegmentSumBuf = GraphBuilder.CreateSRV(SegmentBuf, EPixelFormat::PF_R8_UINT);
+		PassParameters->InoutBuf = GraphBuilder.CreateUAV(InputBuf);
+		PassParameters->SegmentSumBuf = GraphBuilder.CreateSRV(SegmentBuf);
 		FComputeShaderUtils::AddPass(
 			GraphBuilder,
 			RDG_EVENT_NAME("PrefixScanMergeCS"),
@@ -625,21 +612,21 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 	FViewInfo& View,
 	SurfelBufResources& SurfelRes)
 {
-	auto Size = SceneTextures.SceneDepthTexture->Desc.Extent;
-
-	auto TileSurfelAllocSize = FIntPoint::DivideAndRoundUp(SceneTextures.SceneDepthTexture->Desc.Extent, 8);
+	auto Size = View.ViewRect.Size();
+	//auto Size = SceneTextures.SceneDepthTexture->Desc.Extent;
+	auto TileSurfelAllocSize = FIntPoint::DivideAndRoundUp(Size, 8);
 	FRDGTextureDesc Desc = FRDGTextureDesc::Create2D(
 		TileSurfelAllocSize,
 		PF_R32G32_UINT,
-		FClearValueBinding::None,
-		TexCreate_ShaderResource | TexCreate_RenderTargetable | TexCreate_UAV);
+		FClearValueBinding::Black,
+		TexCreate_ShaderResource | TexCreate_UAV);
 	auto TileSurfelAllocTex = GraphBuilder.CreateTexture(Desc, TEXT("TileSurfelAllocTex"));
 
 	FRDGTextureDesc DebugDesc = FRDGTextureDesc::Create2D(
 		Size,
 		PF_A32B32G32R32F,
-		FClearValueBinding::None,
-		TexCreate_ShaderResource | TexCreate_RenderTargetable | TexCreate_UAV);
+		FClearValueBinding::Black,
+		TexCreate_ShaderResource | TexCreate_UAV);
 
 	auto DebugTex = GraphBuilder.CreateTexture(DebugDesc, TEXT("SurfelDebugTex"));
 
@@ -662,27 +649,29 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 		SurfelIndexBuf = GraphBuilder.RegisterExternalBuffer(View.ViewState->SurfelState.SurfelIndexBuf, TEXT("SurfelIndexBuf"));
 		SurfelVertexBuf = GraphBuilder.RegisterExternalBuffer(View.ViewState->SurfelState.SurfelVertexBuf, TEXT("SurfelVertexBuf"));
 		SurfelIrradianceBuf = GraphBuilder.RegisterExternalBuffer(View.ViewState->SurfelState.SurfelIrradianceBuf, TEXT("SurfelIrradianceBuf"));
-		//SurfelSHBuf = GraphBuilder.RegisterExternalBuffer(View.ViewState->SurfelSHBuf, TEXT("SurfelSHBuf"));
+		//SurfelSHBuf = GraphBuilder.RegisterExternalBuffer(View.ViewState->SurfelState.SurfelSHBuf, TEXT("SurfelSHBuf"));
 	}
 	else
 	{
-		//uint32_t SurfelMetaBufData[8] = { 0 }; uint32_t SurfelHashKeyBufData[MAX_SURFEL_CELLS] = { 0 }; uint32_t SurfelCellIndexData[MAX_SURFEL_CELLS+1] = { 0 };
-		//SurfelMetaBuf = CreateVertexBuffer(GraphBuilder, TEXT("SurfelMetaBuf"), FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), 8), SurfelMetaBufData, sizeof(SurfelMetaBufData));
-		//SurfelHashKeyBuf = CreateVertexBuffer(GraphBuilder, TEXT("SurfelHashKeyBuf"), FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), MAX_SURFEL_CELLS), SurfelHashKeyBufData, sizeof(SurfelHashKeyBufData));
-		//SurfelHashValueBuf = CreateVertexBuffer(GraphBuilder, TEXT("SurfelHashValueBuf"), FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), MAX_SURFEL_CELLS), SurfelHashKeyBufData, sizeof(SurfelHashKeyBufData));
-		//CellIndexOffsetBuf = CreateVertexBuffer(GraphBuilder, TEXT("CellIndexOffsetBuf"), FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), MAX_SURFEL_CELLS + 1), SurfelCellIndexData, sizeof(SurfelCellIndexData));
-
-		SurfelMetaBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), 8), TEXT("SurfelMetaBuf"), ERDGBufferFlags::MultiFrame);
-		SurfelHashKeyBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), MAX_SURFEL_CELLS), TEXT("SurfelHashKeyBuf"), ERDGBufferFlags::MultiFrame);
-		SurfelHashValueBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), MAX_SURFEL_CELLS), TEXT("SurfelHashValueBuf"), ERDGBufferFlags::MultiFrame);
-		CellIndexOffsetBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), MAX_SURFEL_CELLS + 1), TEXT("CellIndexOffsetBuf"), ERDGBufferFlags::MultiFrame);
-		SurfelIndexBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), MAX_SURFEL_CELLS * MAX_SURFELS_PER_CELL), TEXT("SurfelIndexBuf"), ERDGBufferFlags::MultiFrame);
+		SurfelMetaBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateByteAddressDesc(sizeof(uint32)* 2), TEXT("SurfelMetaBuf"), ERDGBufferFlags::MultiFrame);
+		SurfelHashKeyBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateByteAddressDesc(sizeof(uint32) * MAX_SURFEL_CELLS), TEXT("SurfelHashKeyBuf"), ERDGBufferFlags::MultiFrame);
+		SurfelHashValueBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateByteAddressDesc(sizeof(uint32) * MAX_SURFEL_CELLS), TEXT("SurfelHashValueBuf"), ERDGBufferFlags::MultiFrame);
+		CellIndexOffsetBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateByteAddressDesc(sizeof(uint32)* (MAX_SURFEL_CELLS + 1)), TEXT("CellIndexOffsetBuf"), ERDGBufferFlags::MultiFrame);
+		SurfelIndexBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateByteAddressDesc(sizeof(uint32) * MAX_SURFEL_CELLS * MAX_SURFELS_PER_CELL), TEXT("SurfelIndexBuf"), ERDGBufferFlags::MultiFrame);
 		SurfelVertexBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateStructuredDesc(sizeof(SurfelVertexPacked), MAX_SURFELS), TEXT("SurfelVertexBuf"), ERDGBufferFlags::MultiFrame);
 
-		SurfelIrradianceBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateStructuredDesc(sizeof(FVector4), MAX_SURFELS), TEXT("SurfelIrradianceBuf"), ERDGBufferFlags::MultiFrame);
-		SurfelSHBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateStructuredDesc(sizeof(FVector4) * 3, MAX_SURFELS), TEXT("SurfelSHBuf"), ERDGBufferFlags::MultiFrame);
+		SurfelIrradianceBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateStructuredDesc(sizeof(FVector4f), MAX_SURFELS), TEXT("SurfelIrradianceBuf"), ERDGBufferFlags::MultiFrame);
+		SurfelSHBuf = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateStructuredDesc(sizeof(FVector4f) * 3, MAX_SURFELS), TEXT("SurfelSHBuf"), ERDGBufferFlags::MultiFrame);
+
+		AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(SurfelMetaBuf), 0);
+		AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(SurfelHashKeyBuf), 0);
+		AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(SurfelHashValueBuf), 0);
+		AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(CellIndexOffsetBuf), 0);
+		AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(SurfelIndexBuf), 0);
 	}
 
+	uint32 ClearValues[4] = { 0, 0, 0, 0};
+	AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(FRDGTextureUAVDesc(TileSurfelAllocTex)), ClearValues);
 
 	//temp res
 	SurfelRes.SurfelMetaBuf = SurfelMetaBuf;
@@ -699,11 +688,11 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 		{
 			TShaderMapRef<FFindMissSurfelCS> ComputeShader(GetGlobalShaderMap(ERHIFeatureLevel::SM5));
 			FFindMissSurfelCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FFindMissSurfelCS::FParameters>();
-			PassParameters->SurfelMetaBuf = GraphBuilder.CreateUAV(SurfelMetaBuf, EPixelFormat::PF_R8_UINT);
-			PassParameters->SurfelHashKeyBuf = GraphBuilder.CreateUAV(SurfelHashKeyBuf, EPixelFormat::PF_R8_UINT);
-			PassParameters->SurfelHashValueBuf = GraphBuilder.CreateUAV(SurfelHashValueBuf, EPixelFormat::PF_R8_UINT);
-			PassParameters->CellIndexOffsetBuf = GraphBuilder.CreateUAV(CellIndexOffsetBuf, EPixelFormat::PF_R8_UINT);
-			PassParameters->SurfelIndexBuf = GraphBuilder.CreateUAV(SurfelIndexBuf, EPixelFormat::PF_R8_UINT);
+			PassParameters->SurfelMetaBuf = GraphBuilder.CreateUAV(SurfelMetaBuf);
+			PassParameters->SurfelHashKeyBuf = GraphBuilder.CreateUAV(SurfelHashKeyBuf);
+			PassParameters->SurfelHashValueBuf = GraphBuilder.CreateUAV(SurfelHashValueBuf);
+			PassParameters->CellIndexOffsetBuf = GraphBuilder.CreateUAV(CellIndexOffsetBuf);
+			PassParameters->SurfelIndexBuf = GraphBuilder.CreateUAV(SurfelIndexBuf);
 
 			PassParameters->SurfelVertexBuf = GraphBuilder.CreateUAV(SurfelVertexBuf);
 			PassParameters->SurfelIrradianceBuf = GraphBuilder.CreateUAV(SurfelIrradianceBuf);
@@ -739,11 +728,8 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 		{
 			TShaderMapRef<FAllocateSurfelCS> ComputeShader(GetGlobalShaderMap(ERHIFeatureLevel::SM5));
 			FAllocateSurfelCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FAllocateSurfelCS::FParameters>();
-			PassParameters->SurfelMetaBuf = GraphBuilder.CreateUAV(SurfelMetaBuf, EPixelFormat::PF_R8_UINT);
+			PassParameters->SurfelMetaBuf = GraphBuilder.CreateUAV(SurfelMetaBuf);
 			PassParameters->SurfelVertexBuf = GraphBuilder.CreateUAV(SurfelVertexBuf);
-			//PassParameters->SurfelHashKeyBuf = GraphBuilder.CreateSRV(SurfelHashKeyBuf);
-			//PassParameters->SurfelHashValueBuf = GraphBuilder.CreateSRV(SurfelHashValueBuf);
-			//PassParameters->SurfelIndexBuf = GraphBuilder.CreateSRV(SurfelIndexBuf);
 
 			PassParameters->TileSurfelAllocTex = TileSurfelAllocTex;
 
@@ -762,7 +748,8 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 			PassParameters->MetallicTexture = GBufferBTexture;
 			PassParameters->PointClampSampler = TStaticSamplerState<SF_Point, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
 			PassParameters->LinearClampSampler = TStaticSamplerState<SF_Trilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
-			PassParameters->ScaledViewSizeAndInvSize = FVector4f(ScaledViewSize.X, ScaledViewSize.Y, 1.0f / ScaledViewSize.X, 1.0f / ScaledViewSize.Y);
+			//PassParameters->ScaledViewSizeAndInvSize = FVector4f(ScaledViewSize.X, ScaledViewSize.Y, 1.0f / ScaledViewSize.X, 1.0f / ScaledViewSize.Y);
+			PassParameters->TileSurfelAllocTexSize = TileSurfelAllocSize;
 			PassParameters->ViewUniformBuffer = View.ViewUniformBuffer;
 
 			ClearUnusedGraphResources(ComputeShader, PassParameters);
@@ -783,8 +770,8 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 		{
 			TShaderMapRef<FDispatchSurfelArgsCS> ComputeShader(GetGlobalShaderMap(ERHIFeatureLevel::SM5));
 			FDispatchSurfelArgsCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FDispatchSurfelArgsCS::FParameters>();
-			PassParameters->IndirectDispatchArgs = GraphBuilder.CreateUAV(DispatchArgs, EPixelFormat::PF_R8_UINT);
-			PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelMetaBuf, EPixelFormat::PF_R8_UINT);
+			PassParameters->RWIndirectDispatchArgs = GraphBuilder.CreateUAV(FRDGBufferUAVDesc(DispatchArgs, PF_R32_UINT));
+			PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelMetaBuf);
 
 			ClearUnusedGraphResources(ComputeShader, PassParameters);
 			FComputeShaderUtils::AddPass(
@@ -798,8 +785,8 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 		{
 			TShaderMapRef<FClearSurfelCS> ComputeShader(GetGlobalShaderMap(ERHIFeatureLevel::SM5));
 			FClearSurfelCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FClearSurfelCS::FParameters>();
-			PassParameters->CellIndexOffsetBuf = GraphBuilder.CreateUAV(CellIndexOffsetBuf, EPixelFormat::PF_R8_UINT);
-			PassParameters->IndirectDispatchArgs = DispatchArgs;
+			PassParameters->CellIndexOffsetBuf = GraphBuilder.CreateUAV(CellIndexOffsetBuf);
+			PassParameters->RWIndirectDispatchArgs = DispatchArgs;
 			ClearUnusedGraphResources(ComputeShader, PassParameters);
 			FComputeShaderUtils::AddPass(
 				GraphBuilder,
@@ -813,15 +800,15 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 		{
 			TShaderMapRef<FCountSurfelPerCellCS> ComputeShader(GetGlobalShaderMap(ERHIFeatureLevel::SM5));
 			FCountSurfelPerCellCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FCountSurfelPerCellCS::FParameters>();
-			PassParameters->CellIndexOffsetBuf = GraphBuilder.CreateUAV(CellIndexOffsetBuf, EPixelFormat::PF_R8_UINT);
-			PassParameters->SurfelIndexBuf = GraphBuilder.CreateUAV(SurfelIndexBuf, EPixelFormat::PF_R8_UINT);
+			PassParameters->CellIndexOffsetBuf = GraphBuilder.CreateUAV(CellIndexOffsetBuf);
+			PassParameters->SurfelIndexBuf = GraphBuilder.CreateUAV(SurfelIndexBuf);
 
-			PassParameters->SurfelHashKeyBuf = GraphBuilder.CreateSRV(SurfelHashKeyBuf, EPixelFormat::PF_R8_UINT);
-			PassParameters->SurfelHashValueBuf = GraphBuilder.CreateSRV(SurfelHashValueBuf, EPixelFormat::PF_R8_UINT);
-			PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelMetaBuf, EPixelFormat::PF_R8_UINT);
+			PassParameters->SurfelHashKeyBuf = GraphBuilder.CreateSRV(SurfelHashKeyBuf);
+			PassParameters->SurfelHashValueBuf = GraphBuilder.CreateSRV(SurfelHashValueBuf);
+			PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelMetaBuf);
 			PassParameters->SurfelVertexBuf = GraphBuilder.CreateSRV(SurfelVertexBuf);
 			PassParameters->ViewUniformBuffer = View.ViewUniformBuffer;
-			PassParameters->IndirectDispatchArgs = DispatchArgs;
+			PassParameters->RWIndirectDispatchArgs = DispatchArgs;
 			ClearUnusedGraphResources(ComputeShader, PassParameters);
 			FComputeShaderUtils::AddPass(
 				GraphBuilder,
@@ -838,15 +825,15 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 			TShaderMapRef<FSlotSurfelIntoCellCS> ComputeShader(GetGlobalShaderMap(ERHIFeatureLevel::SM5));
 			FSlotSurfelIntoCellCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FSlotSurfelIntoCellCS::FParameters>();
 
-			PassParameters->CellIndexOffsetBuf = GraphBuilder.CreateUAV(CellIndexOffsetBuf, EPixelFormat::PF_R8_UINT);
-			PassParameters->SurfelIndexBuf = GraphBuilder.CreateUAV(SurfelIndexBuf, EPixelFormat::PF_R8_UINT);
+			PassParameters->CellIndexOffsetBuf = GraphBuilder.CreateUAV(CellIndexOffsetBuf);
+			PassParameters->SurfelIndexBuf = GraphBuilder.CreateUAV(SurfelIndexBuf);
 
 			PassParameters->ViewUniformBuffer = View.ViewUniformBuffer;
-			PassParameters->SurfelHashKeyBuf = GraphBuilder.CreateSRV(SurfelHashKeyBuf, EPixelFormat::PF_R8_UINT);
-			PassParameters->SurfelHashValueBuf = GraphBuilder.CreateSRV(SurfelHashValueBuf, EPixelFormat::PF_R8_UINT);
-			PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelMetaBuf, EPixelFormat::PF_R8_UINT);
+			PassParameters->SurfelHashKeyBuf = GraphBuilder.CreateSRV(SurfelHashKeyBuf);
+			PassParameters->SurfelHashValueBuf = GraphBuilder.CreateSRV(SurfelHashValueBuf);
+			PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelMetaBuf);
 			PassParameters->SurfelVertexBuf = GraphBuilder.CreateSRV(SurfelVertexBuf);
-			PassParameters->IndirectDispatchArgs = DispatchArgs;
+			PassParameters->RWIndirectDispatchArgs = DispatchArgs;
 			ClearUnusedGraphResources(ComputeShader, PassParameters);
 			FComputeShaderUtils::AddPass(
 				GraphBuilder,
@@ -918,7 +905,7 @@ bool FDeferredShadingSceneRenderer::SurfelTrace(FRDGBuilder& GraphBuilder,
 		PassParameters->RenderTileOffsetY = 0;
 		PassParameters->SurfelIrradianceBuf = GraphBuilder.CreateUAV(SurfelRes.SurfelIrradianceBuf);
 		PassParameters->SurfelVertexBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelVertexBuf);
-		PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelMetaBuf, EPixelFormat::PF_R8_UINT);
+		PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelMetaBuf);
 		FSurfelTraceRGS::FPermutationDomain PermutationVector;
 		PermutationVector.Set<FSurfelTraceRGS::FEnableTwoSidedGeometryDim>(CVarRayTracingGlobalIlluminationEnableTwoSidedGeometry.GetValueOnRenderThread() != 0);
 		PermutationVector.Set<FSurfelTraceRGS::FEnableTransmissionDim>(CVarRayTracingGlobalIlluminationEnableTransmission.GetValueOnRenderThread());
@@ -939,6 +926,7 @@ bool FDeferredShadingSceneRenderer::SurfelTrace(FRDGBuilder& GraphBuilder,
 					FRayTracingShaderBindingsWriter GlobalResources;
 					SetShaderParameters(GlobalResources, RayGenerationShader, *PassParameters);
 					RHICmdList.RayTraceDispatch(View.RayTracingMaterialPipeline, RayGenerationShader.GetRayTracingShader(), RayTracingSceneRHI, GlobalResources, RayTracingResolution.X, RayTracingResolution.Y);
+					
 				});
 		}
 	}
@@ -964,8 +952,8 @@ void FDeferredShadingSceneRenderer::SurfelGI(FRDGBuilder& GraphBuilder,
 	//{
 	//	RDG_GPU_STAT_SCOPE(GraphBuilder, ApplySurfel);
 	//	RDG_EVENT_SCOPE(GraphBuilder, "Surfel GI: ApplySurfel");
-	//	int32 RayTracingGISamplesPerPixel = GetRayTracingGlobalIlluminationSamplesPerPixel(View);
-	//	if (RayTracingGISamplesPerPixel <= 0) return false;
+	//	int32 RayTracingGISamplesPerPixel = 1;
+	//	if (RayTracingGISamplesPerPixel <= 0) return;
 	//	//Apply Surfel
 	//	float MaxShadowDistance = 1.0e27;
 	//	if (GRayTracingGlobalIlluminationMaxShadowDistance > 0.0)
@@ -997,18 +985,12 @@ void FDeferredShadingSceneRenderer::SurfelGI(FRDGBuilder& GraphBuilder,
 	//	PassParameters->UseFireflySuppression = CVarRayTracingGlobalIlluminationFireflySuppression.GetValueOnRenderThread() != 0;
 	//	PassParameters->DiffuseThreshold = GRayTracingGlobalIlluminationDiffuseThreshold;
 	//	PassParameters->NextEventEstimationSamples = GRayTracingGlobalIlluminationNextEventEstimationSamples;
-	//	PassParameters->TLAS = View.RayTracingScene.RayTracingSceneRHI->GetShaderResourceView();
+	//	PassParameters->TLAS = View.GetRayTracingSceneViewChecked();
 	//	PassParameters->ViewUniformBuffer = View.ViewUniformBuffer;
 	//	SetupLightParameters(Scene, View, GraphBuilder, &PassParameters->SceneLights, &PassParameters->SceneLightCount, &PassParameters->SkylightParameters);
 	//	PassParameters->SceneTextures = SceneTextures;
-	//	PassParameters->AccumulateEmissive = FMath::Clamp(CVarRayTracingGlobalIlluminationAccumulateEmissive.GetValueOnRenderThread(), 0, 1);
-	//	// TODO: should be converted to RDG
-	//	TRefCountPtr<IPooledRenderTarget> SubsurfaceProfileRT((IPooledRenderTarget*)GetSubsufaceProfileTexture_RT(GraphBuilder.RHICmdList));
-	//	if (!SubsurfaceProfileRT)
-	//	{
-	//		SubsurfaceProfileRT = GSystemTextures.BlackDummy;
-	//	}
-	//	PassParameters->SSProfilesTexture = GraphBuilder.RegisterExternalTexture(SubsurfaceProfileRT);
+	//	PassParameters->AccumulateEmissive = false;
+	//	
 	//	PassParameters->TransmissionProfilesLinearSampler = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
 	//	PassParameters->RWGlobalIlluminationUAV = GraphBuilder.CreateUAV(OutDenoiserInputs->Color);
 	//	PassParameters->RWGlobalIlluminationRayDistanceUAV = GraphBuilder.CreateUAV(OutDenoiserInputs->RayHitDistance);
@@ -1016,12 +998,12 @@ void FDeferredShadingSceneRenderer::SurfelGI(FRDGBuilder& GraphBuilder,
 	//	PassParameters->RenderTileOffsetY = 0;
 
 	//	PassParameters->SurfelIrradianceBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelIrradianceBuf);
-	//	PassParameters->CellIndexOffsetBuf = GraphBuilder.CreateSRV(SurfelRes.CellIndexOffsetBuf, EPixelFormat::PF_R8_UINT);
-	//	PassParameters->SurfelIndexBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelIndexBuf, EPixelFormat::PF_R8_UINT);
+	//	PassParameters->CellIndexOffsetBuf = GraphBuilder.CreateSRV(SurfelRes.CellIndexOffsetBuf);
+	//	PassParameters->SurfelIndexBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelIndexBuf);
 
-	//	PassParameters->SurfelHashKeyBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelHashKeyBuf, EPixelFormat::PF_R8_UINT);
-	//	PassParameters->SurfelHashValueBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelHashValueBuf, EPixelFormat::PF_R8_UINT);
-	//	PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelMetaBuf, EPixelFormat::PF_R8_UINT);
+	//	PassParameters->SurfelHashKeyBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelHashKeyBuf);
+	//	PassParameters->SurfelHashValueBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelHashValueBuf);
+	//	PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelMetaBuf);
 	//	PassParameters->SurfelVertexBuf = GraphBuilder.CreateSRV(SurfelRes.SurfelVertexBuf);
 
 	//	FApplySurfelRGS::FPermutationDomain PermutationVector;
@@ -1040,7 +1022,7 @@ void FDeferredShadingSceneRenderer::SurfelGI(FRDGBuilder& GraphBuilder,
 	//			ERDGPassFlags::Compute,
 	//			[PassParameters, this, &View, RayGenerationShader, RayTracingResolution](FRHIRayTracingCommandList& RHICmdList)
 	//			{
-	//				FRHIRayTracingScene* RayTracingSceneRHI = View.RayTracingScene.RayTracingSceneRHI;
+	//				FRHIRayTracingScene* RayTracingSceneRHI = View.GetRayTracingSceneChecked();
 
 	//				FRayTracingShaderBindingsWriter GlobalResources;
 	//				SetShaderParameters(GlobalResources, RayGenerationShader, *PassParameters);
@@ -1049,6 +1031,8 @@ void FDeferredShadingSceneRenderer::SurfelGI(FRDGBuilder& GraphBuilder,
 	//	}
 	//}
 
+	RenderRestirGI(GraphBuilder, SceneTextures, View, RayTracingConfig, UpscaleFactor, OutDenoiserInputs, &SurfelRes);
+	
 	// After we are done, make sure we remember our texture for next time so that we can accumulate samples across frames
 	GraphBuilder.QueueBufferExtraction(SurfelRes.SurfelIrradianceBuf, &View.ViewState->SurfelState.SurfelIrradianceBuf);
 	GraphBuilder.QueueBufferExtraction(SurfelRes.SurfelVertexBuf, &View.ViewState->SurfelState.SurfelVertexBuf);
@@ -1057,9 +1041,7 @@ void FDeferredShadingSceneRenderer::SurfelGI(FRDGBuilder& GraphBuilder,
 	GraphBuilder.QueueBufferExtraction(SurfelRes.SurfelHashValueBuf, &View.ViewState->SurfelState.SurfelHashValueBuf);
 	GraphBuilder.QueueBufferExtraction(SurfelRes.CellIndexOffsetBuf, &View.ViewState->SurfelState.CellIndexOffsetBuf);
 	GraphBuilder.QueueBufferExtraction(SurfelRes.SurfelIndexBuf, &View.ViewState->SurfelState.SurfelIndexBuf);
-	//GraphBuilder.QueueBufferExtraction(SurfelRes.SurfelSHBuf, &View.ViewState->SurfelSHBuf);
-
-	RenderRestirGI(GraphBuilder, SceneTextures, View, RayTracingConfig, UpscaleFactor, OutDenoiserInputs, &SurfelRes);
+	//GraphBuilder.QueueBufferExtraction(SurfelRes.SurfelSHBuf, &View.ViewState->SurfelState.SurfelSHBuf);
 }
 
 #endif

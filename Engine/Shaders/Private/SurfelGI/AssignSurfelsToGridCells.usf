@@ -5,20 +5,33 @@
 //#include "SurfelGridHash.ush"
 
 ByteAddressBuffer SurfelMetaBuf;
-RWByteAddressBuffer IndirectDispatchArgs;
+// RWByteAddressBuffer RWIndirectDispatchArgs;
+
+RWBuffer<uint> RWIndirectDispatchArgs;
+
+void WriteArgs1D(uint Index, uint ThreadCount)
+{
+	RWIndirectDispatchArgs[Index * 3 + 0] = ThreadCount;
+	RWIndirectDispatchArgs[Index * 3 + 1] = 1;
+	RWIndirectDispatchArgs[Index * 3 + 2] = 1;
+}
 
 [numthreads(1, 1, 1)]
 void PrepareDispatchArgs() 
 {
+    // const uint CellCount = min(SurfelMetaBuf.Load(sizeof(uint)* 0), MAX_SURFEL_CELLS);
+    // const uint SurfelCount = min(SurfelMetaBuf.Load(sizeof(uint) * 1),MAX_SURFEL_CELLS * MAX_SURFELS_PER_CELL) ;
     const uint CellCount = SurfelMetaBuf.Load(sizeof(uint)* 0);
     const uint SurfelCount = SurfelMetaBuf.Load(sizeof(uint) * 1);
+    // const uint CellCount = MAX_SURFEL_CELLS;
     // Cell clearing args
     {
         static const uint ThreadsPerGroup = 64;
         static const uint EntriesPerThread = 4;
         static const uint Divisor = ThreadsPerGroup * EntriesPerThread;
 
-        IndirectDispatchArgs.Store3(0 * sizeof(uint3), uint3((CellCount + Divisor - 1) / Divisor, 1, 1));
+        //RWIndirectDispatchArgs.Store3(0 * sizeof(uint3), uint3((CellCount + Divisor - 1) / Divisor, 1, 1));
+        WriteArgs1D(0, (CellCount + Divisor - 1) / Divisor);
     }
 
     // Surfel binning args
@@ -27,7 +40,8 @@ void PrepareDispatchArgs()
         static const uint EntriesPerThread = 1;
         static const uint Divisor = ThreadsPerGroup * EntriesPerThread;
 
-        IndirectDispatchArgs.Store3(1 * sizeof(uint3), uint3((SurfelCount + Divisor - 1) / Divisor, 1, 1));
+        // RWIndirectDispatchArgs.Store3(1 * sizeof(uint3), uint3((SurfelCount + Divisor - 1) / Divisor, 1, 1));
+        WriteArgs1D(1, (SurfelCount + Divisor - 1) / Divisor);
     }
 }
 
@@ -41,6 +55,7 @@ RWByteAddressBuffer CellIndexOffsetBuf;
 void ClearSurfels(uint thread_index: SV_DispatchThreadID) 
 {
     CellIndexOffsetBuf.Store4(sizeof(uint4) * thread_index, uint4(0, 0, 0, 0));
+    // CellIndexOffsetBuf.Store(sizeof(uint) * thread_index, 0);
 }
 
 #endif
@@ -62,7 +77,8 @@ StructuredBuffer<float4> SurfelIrradianceBuf;
 [numthreads(64, 1, 1)]
 void SlotSurfelIntoCell(uint SurfelIdx: SV_DispatchThreadID) 
 {
-    const uint SurfelCount = SurfelMetaBuf.Load(1 * sizeof(uint));
+    // const uint SurfelCount = min(SurfelMetaBuf.Load(sizeof(uint) * 1),MAX_SURFEL_CELLS * MAX_SURFELS_PER_CELL) ;
+    const uint SurfelCount = SurfelMetaBuf.Load(sizeof(uint) * 1);
     if (SurfelIdx >= SurfelCount) 
     {
         return;
@@ -119,7 +135,8 @@ StructuredBuffer<float4> SurfelIrradianceBuf;
 [numthreads(64, 1, 1)]
 void CountSurfelsPerCell(uint SurfelIdx: SV_DispatchThreadID) 
 {
-    const uint SurfelCount = SurfelMetaBuf.Load(1 * sizeof(uint));
+    // const uint SurfelCount = min(SurfelMetaBuf.Load(sizeof(uint) * 1),MAX_SURFEL_CELLS * MAX_SURFELS_PER_CELL) ;
+    const uint SurfelCount = SurfelMetaBuf.Load(sizeof(uint) * 1);
     if (SurfelIdx >= SurfelCount) 
         return;
 
