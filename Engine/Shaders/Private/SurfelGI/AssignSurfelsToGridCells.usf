@@ -5,16 +5,16 @@
 //#include "SurfelGridHash.ush"
 
 ByteAddressBuffer SurfelMetaBuf;
-// RWByteAddressBuffer RWIndirectDispatchArgs;
+RWByteAddressBuffer RWIndirectDispatchArgs;
 
-RWBuffer<uint> RWIndirectDispatchArgs;
+// RWBuffer<uint> RWIndirectDispatchArgs;
 
-void WriteArgs1D(uint Index, uint ThreadCount)
-{
-	RWIndirectDispatchArgs[Index * 3 + 0] = ThreadCount;
-	RWIndirectDispatchArgs[Index * 3 + 1] = 1;
-	RWIndirectDispatchArgs[Index * 3 + 2] = 1;
-}
+// void WriteArgs1D(uint Index, uint ThreadCount)
+// {
+// 	RWIndirectDispatchArgs[Index * 3 + 0] = ThreadCount;
+// 	RWIndirectDispatchArgs[Index * 3 + 1] = 1;
+// 	RWIndirectDispatchArgs[Index * 3 + 2] = 1;
+// }
 
 [numthreads(1, 1, 1)]
 void PrepareDispatchArgs() 
@@ -30,8 +30,8 @@ void PrepareDispatchArgs()
         static const uint EntriesPerThread = 4;
         static const uint Divisor = ThreadsPerGroup * EntriesPerThread;
 
-        //RWIndirectDispatchArgs.Store3(0 * sizeof(uint3), uint3((CellCount + Divisor - 1) / Divisor, 1, 1));
-        WriteArgs1D(0, (CellCount + Divisor - 1) / Divisor);
+        RWIndirectDispatchArgs.Store3(0 * sizeof(uint3), uint3((CellCount + Divisor - 1) / Divisor, 1, 1));
+        //WriteArgs1D(0, (CellCount + Divisor - 1) / Divisor);
     }
 
     // Surfel binning args
@@ -40,8 +40,8 @@ void PrepareDispatchArgs()
         static const uint EntriesPerThread = 1;
         static const uint Divisor = ThreadsPerGroup * EntriesPerThread;
 
-        // RWIndirectDispatchArgs.Store3(1 * sizeof(uint3), uint3((SurfelCount + Divisor - 1) / Divisor, 1, 1));
-        WriteArgs1D(1, (SurfelCount + Divisor - 1) / Divisor);
+        RWIndirectDispatchArgs.Store3(1 * sizeof(uint3), uint3((SurfelCount + Divisor - 1) / Divisor, 1, 1));
+        //WriteArgs1D(1, (SurfelCount + Divisor - 1) / Divisor);
     }
 }
 

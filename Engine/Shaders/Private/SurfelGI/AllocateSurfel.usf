@@ -104,7 +104,7 @@ void FindMissSurfel(
     const bool bIsValidPixel = DeviceZ > 1e-3 && DeviceZ < 0.999;
     if ( !bIsValidPixel) return;
     float SceneDepth = ConvertFromDeviceZ(DeviceZ);
-	float3 WorldPosition = ReconstructTranslatedWorldPositionFromDepth(BufferUV, SceneDepth);
+	float3 WorldPosition = ReconstructWorldPositionFromDepth(BufferUV, SceneDepth);
     float3 WorldNormal = normalize(DecodeNormal(NormalTexture.SampleLevel(LinearClampSampler, BufferUV, 0).xyz));
 
     SurfelGridHashEntry entry = SurfelHashLookupByGridCoord(GetSurfelGridCoordFromPos(WorldPosition / SURFEL_UNIT_SCALE ));
@@ -295,7 +295,7 @@ void AllocateSurfels(
     const bool bIsValidPixel = DeviceZ > 1e-3;
     if ( !bIsValidPixel) return;
     float SceneDepth = ConvertFromDeviceZ(DeviceZ);
-	float3 WorldPosition = ReconstructTranslatedWorldPositionFromDepth(BufferUV, SceneDepth);
+	float3 WorldPosition = ReconstructWorldPositionFromDepth(BufferUV, SceneDepth);
     float3 WorldNormal = normalize(DecodeNormal(NormalTexture.SampleLevel(LinearClampSampler, BufferUV, 0).xyz));
 
     float3 BaseColor = DecodeBaseColor(BaseColorTexture.SampleLevel(PointClampSampler, BufferUV, 0).rgb);

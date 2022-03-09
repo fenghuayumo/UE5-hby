@@ -166,7 +166,7 @@ class FDispatchSurfelArgsCS : public FGlobalShader
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER_RDG_BUFFER_SRV(ByteAddressBuffer, SurfelMetaBuf)
-		SHADER_PARAMETER_RDG_BUFFER_UAV(RWBuffer<uint>, RWIndirectDispatchArgs)
+		SHADER_PARAMETER_RDG_BUFFER_UAV(RWByteBuffer<uint>, RWIndirectDispatchArgs)
 	END_SHADER_PARAMETER_STRUCT()
 };
 IMPLEMENT_GLOBAL_SHADER(FDispatchSurfelArgsCS, "/Engine/Private/SurfelGI/AssignSurfelsToGridCells.usf", "PrepareDispatchArgs", SF_Compute);
@@ -205,8 +205,8 @@ class FCountSurfelPerCellCS : public FGlobalShader
 		SHADER_PARAMETER_RDG_BUFFER_UAV(RWByteAddressBuffer, SurfelIndexBuf)
 		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<float4>, SurfelIrradianceBuf)
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, ViewUniformBuffer)
-		// SHADER_PARAMETER_RDG_BUFFER(ByteAddressBuffer, RWIndirectDispatchArgs)
-		RDG_BUFFER_ACCESS(RWIndirectDispatchArgs, ERHIAccess::IndirectArgs)
+		// SHADER_PARAMETER_RDG_BUFFER(ByteAddressBuffer, IndirectDispatchArgs)
+		RDG_BUFFER_ACCESS(IndirectDispatchArgs, ERHIAccess::IndirectArgs)
 	END_SHADER_PARAMETER_STRUCT()
 };
 IMPLEMENT_GLOBAL_SHADER(FCountSurfelPerCellCS, "/Engine/Private/SurfelGI/AssignSurfelsToGridCells.usf", "CountSurfelsPerCell", SF_Compute);
@@ -246,7 +246,7 @@ class FSlotSurfelIntoCellCS : public FGlobalShader
 		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<float4>, SurfelIrradianceBuf)
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, ViewUniformBuffer)
 		// SHADER_PARAMETER_RDG_BUFFER(ByteAddressBuffer, IndirectDispatchArgs)
-		RDG_BUFFER_ACCESS(RWIndirectDispatchArgs, ERHIAccess::IndirectArgs)
+		RDG_BUFFER_ACCESS(IndirectDispatchArgs, ERHIAccess::IndirectArgs)
 	END_SHADER_PARAMETER_STRUCT()
 };
 IMPLEMENT_GLOBAL_SHADER(FSlotSurfelIntoCellCS, "/Engine/Private/SurfelGI/AssignSurfelsToGridCells.usf", "SlotSurfelIntoCell", SF_Compute);
@@ -278,8 +278,8 @@ class FClearSurfelCS : public FGlobalShader
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 
 		SHADER_PARAMETER_RDG_BUFFER_UAV(RWByteAddressBuffer, CellIndexOffsetBuf)
-		// SHADER_PARAMETER_RDG_BUFFER(ByteAddressBuffer, RWIndirectDispatchArgs)
-		RDG_BUFFER_ACCESS(RWIndirectDispatchArgs, ERHIAccess::IndirectArgs)
+		// SHADER_PARAMETER_RDG_BUFFER(ByteAddressBuffer, IndirectDispatchArgs)
+		RDG_BUFFER_ACCESS(IndirectDispatchArgs, ERHIAccess::IndirectArgs)
 	END_SHADER_PARAMETER_STRUCT()
 };
 IMPLEMENT_GLOBAL_SHADER(FClearSurfelCS, "/Engine/Private/SurfelGI/AssignSurfelsToGridCells.usf", "ClearSurfels", SF_Compute);
@@ -770,7 +770,7 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 		{
 			TShaderMapRef<FDispatchSurfelArgsCS> ComputeShader(GetGlobalShaderMap(ERHIFeatureLevel::SM5));
 			FDispatchSurfelArgsCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FDispatchSurfelArgsCS::FParameters>();
-			PassParameters->RWIndirectDispatchArgs = GraphBuilder.CreateUAV(FRDGBufferUAVDesc(DispatchArgs, PF_R32_UINT));
+			PassParameters->RWIndirectDispatchArgs = GraphBuilder.CreateUAV(DispatchArgs, EPixelFormat::PF_R8_UINT);
 			PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelMetaBuf);
 
 			ClearUnusedGraphResources(ComputeShader, PassParameters);
@@ -786,7 +786,7 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 			TShaderMapRef<FClearSurfelCS> ComputeShader(GetGlobalShaderMap(ERHIFeatureLevel::SM5));
 			FClearSurfelCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FClearSurfelCS::FParameters>();
 			PassParameters->CellIndexOffsetBuf = GraphBuilder.CreateUAV(CellIndexOffsetBuf);
-			PassParameters->RWIndirectDispatchArgs = DispatchArgs;
+			PassParameters->IndirectDispatchArgs = DispatchArgs;
 			ClearUnusedGraphResources(ComputeShader, PassParameters);
 			FComputeShaderUtils::AddPass(
 				GraphBuilder,
@@ -808,7 +808,7 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 			PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelMetaBuf);
 			PassParameters->SurfelVertexBuf = GraphBuilder.CreateSRV(SurfelVertexBuf);
 			PassParameters->ViewUniformBuffer = View.ViewUniformBuffer;
-			PassParameters->RWIndirectDispatchArgs = DispatchArgs;
+			PassParameters->IndirectDispatchArgs = DispatchArgs;
 			ClearUnusedGraphResources(ComputeShader, PassParameters);
 			FComputeShaderUtils::AddPass(
 				GraphBuilder,
@@ -833,7 +833,7 @@ void FDeferredShadingSceneRenderer::AllocateSurfels(FRDGBuilder& GraphBuilder,
 			PassParameters->SurfelHashValueBuf = GraphBuilder.CreateSRV(SurfelHashValueBuf);
 			PassParameters->SurfelMetaBuf = GraphBuilder.CreateSRV(SurfelMetaBuf);
 			PassParameters->SurfelVertexBuf = GraphBuilder.CreateSRV(SurfelVertexBuf);
-			PassParameters->RWIndirectDispatchArgs = DispatchArgs;
+			PassParameters->IndirectDispatchArgs = DispatchArgs;
 			ClearUnusedGraphResources(ComputeShader, PassParameters);
 			FComputeShaderUtils::AddPass(
 				GraphBuilder,
