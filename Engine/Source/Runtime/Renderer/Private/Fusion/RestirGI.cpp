@@ -30,7 +30,7 @@ static TAutoConsoleVariable<int32> CVarRestirGISpatial(
 	ECVF_RenderThreadSafe);
 
 static TAutoConsoleVariable<int32> CVarRestirGIInitialCandidates(
-	TEXT("r.RayTracing.RestirGI.InitialSamples"), 2,
+	TEXT("r.RayTracing.RestirGI.InitialSamples"), 1,
 	TEXT("How many lights to test sample during the initial candidate search"),
 	ECVF_RenderThreadSafe);
 
@@ -670,15 +670,6 @@ void FDeferredShadingSceneRenderer::RenderRestirGI(
 			bool UseSurfel = IsFusionGIEnabled(View) && CVarRestirGIUseSurfel.GetValueOnRenderThread() != 0;
 			if (SurfelRes && UseSurfel)
 			{
-			/*	auto SurfelMetaBuf = GraphBuilder.RegisterExternalBuffer(View.ViewState->SurfelState.SurfelMetaBuf, TEXT("SurfelMetaBuf"));
-				auto SurfelHashKeyBuf = GraphBuilder.RegisterExternalBuffer(View.ViewState->SurfelState.SurfelHashKeyBuf, TEXT("SurfelHashKeyBuf"));
-				auto SurfelHashValueBuf = GraphBuilder.RegisterExternalBuffer(View.ViewState->SurfelState.SurfelHashValueBuf, TEXT("SurfelHashValueBuf"));
-				auto CellIndexOffsetBuf = GraphBuilder.RegisterExternalBuffer(View.ViewState->SurfelState.CellIndexOffsetBuf, TEXT("CellIndexOffsetBuf"));
-				auto SurfelIndexBuf = GraphBuilder.RegisterExternalBuffer(View.ViewState->SurfelState.SurfelIndexBuf, TEXT("SurfelIndexBuf"));
-				auto SurfelVertexBuf = GraphBuilder.RegisterExternalBuffer(View.ViewState->SurfelState.SurfelVertexBuf, TEXT("SurfelVertexBuf"));
-				auto SurfelIrradianceBuf = GraphBuilder.RegisterExternalBuffer(View.ViewState->SurfelState.SurfelIrradianceBuf, TEXT("SurfelIrradianceBuf"));*/
-
-
 				PassParameters->SurfelIrradianceBuf = GraphBuilder.CreateSRV(SurfelRes->SurfelIrradianceBuf);
 				PassParameters->CellIndexOffsetBuf = GraphBuilder.CreateSRV(SurfelRes->CellIndexOffsetBuf, EPixelFormat::PF_R8_UINT);
 				PassParameters->SurfelIndexBuf = GraphBuilder.CreateSRV(SurfelRes->SurfelIndexBuf, EPixelFormat::PF_R8_UINT);
