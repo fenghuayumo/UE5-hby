@@ -29,6 +29,17 @@ float3 ReconstructTranslatedWorldPositionFromDepth(float2 UV, float SceneDepth)
 	return TranslatedWorldPosition;
 }
 
+void ReconstructWorldPositionAndCameraDirectionFromDeviceZ(uint2 PixelCoord, float DeviceZ, out float3 OutWorldPosition, out float3 OutCameraDirection)
+{
+	float SceneDepth = ConvertFromDeviceZ(DeviceZ);
+	float2 InvBufferSize = View.BufferSizeAndInvSize.zw;
+	float2 UV = (float2(PixelCoord) + 0.5) * InvBufferSize;
+	float2 ScreenPosition = (UV - View.ScreenPositionScaleBias.wz) / View.ScreenPositionScaleBias.xy;
+	float4 HomogeneousWorldPosition = mul(float4(ScreenPosition * SceneDepth, SceneDepth, 1), LWCHackToFloat(PrimaryView.ScreenToWorld));
+	OutWorldPosition = HomogeneousWorldPosition.xyz / HomogeneousWorldPosition.w;
+	OutCameraDirection = normalize(OutWorldPosition - LWCHackToFloat(PrimaryView.WorldCameraOrigin));
+}
+
 float3 ReconstructWorldPositionFromDepth(float2 UV, float Depth)
 {
 	float2 ScreenPosition = (UV - View.ScreenPositionScaleBias.wz) / View.ScreenPositionScaleBias.xy;
